@@ -1,0 +1,857 @@
+NVR_Monitoring_Script_V2.ps1
+
+<#
+.SYNOPSIS
+NVR Monitoring Script
+Author: Me
+Date: 2023-08-23
+
+.DESCRIPTION
+This script collects various system and monitoring information from an NVR (Network Video Recorder) and logs it into separate CSV files. It covers disk health, RAID status, Windows information, performance counters, software versions, and more.
+
+.NOTES
+File Name      : NVR_Monitoring_Script_V2.ps1
+Author         : Me
+Prerequisite   : CLI utilities (cli.exe, RstCliPro.exe, cscript.exe), CIMCmdlets module
+
+.EXAMPLE
+.\NVR_Monitoring_Script_V2.ps1
+Runs the script to collect and log system and monitoring information.
+
+#>
+
+# Change the working directory to C:\Monitoring
+Set-Location -Path "C:\Monitoring"
+
+# Define the destination directory for copied files
+$destinationDirectory = "C:\Monitoring\CSV"
+
+# If the destination directory doesn't exist, create it
+if (-not (Test-Path -Path $destinationDirectory -PathType Container)) {
+    New-Item -Path $destinationDirectory -ItemType Directory | Out-Null
+}
+
+##
+Write-Host "#*******************************************************************************"
+Write-Host "# NVR Monitoring Script"
+Write-Host "# Created by Me"
+Write-Host "#*******************************************************************************"
+
+# Delete existing CSV files
+$csvFilesToDelete = @(
+    "C:\Monitoring\CSV\$(Hostname)_Disk.csv",
+    "C:\Monitoring\CSV\$(Hostname)_VSF.csv",
+    "C:\Monitoring\CSV\$(Hostname)_RSF.csv",
+    "C:\Monitoring\CSV\$(Hostname)_RstStates.csv",
+    "C:\Monitoring\CSV\$(Hostname)_Rst_Info.csv",
+    "C:\Monitoring\CSV\$(Hostname)_DiskSpace.csv",
+    "C:\Monitoring\CSV\$(Hostname)_Windows_Info.csv",
+    "C:\Monitoring\CSV\$(Hostname)_license_info.csv",
+    "C:\Monitoring\CSV\$(Hostname)_performance_data.csv",
+    "C:\Monitoring\CSV\$(Hostname)_SW_Versions.csv",
+    "C:\Monitoring\CSV\$(Hostname)_Certificates_ExpiringSoon.csv"
+)
+
+foreach ($csvFile in $csvFilesToDelete) {
+    if (Test-Path $csvFile) {
+        Remove-Item -Path $csvFile -Force
+        Write-Host "Deleted existing file: $csvFile"
+    }
+}
+
+## X - Video storage RAID Health
+$logfileDiskCSV =  "C:\Monitoring\CSV\$(Hostname)_Disk.csv"
+
+$commandOutput = C:\Monitoring\cli.exe disk info | findstr /v /r /c:"==" /c:"GuiErrMsg"
+
+$match_regex = [Regex] '^(.{4})(.{5})(.{8})(.{30})(.{12})(.{4})'
+
+$match_evaluator = {
+    param($match)
+
+    # The first element of Groups contains the entire matched text; skip it
+    $fields = $match.Groups `
+        | Select-Object -Skip 1 `
+        | ForEach-Object -Process {
+            $field = $_.Value.Trim()
+            if ($groupsToNormalizeToZero -contains $_.Name -and $field -eq '')
+            {
+                $field = '0'
+            }
+            return $field
+        }
+    return ($fields -join $delimiter)
+}
+
+$delimiter = ','
+# Replace with a HashSet/Hashtable for better lookup performance
+$groupsToNormalizeToZero = ,'3'
+
+$outputLines = $commandOutput -split "`r`n"
+$processedOutput = foreach ($line in $outputLines) {
+    $new_line = $match_regex.Replace($line, $match_evaluator)
+
+    # The original input string is returned if there was no match
+    if (-not [Object]::ReferenceEquals($line, $new_line)) {
+        $new_line
+    }
+}
+
+$processedOutput | Set-Content -Path $logfileDiskCSV -Force
+
+##
+
+$logfileVSFCSV = "C:\Monitoring\CSV\$(Hostname)_VSF.csv"
+
+$commandOutput = C:\Monitoring\cli.exe vsf info | findstr /v /r /c:"==" /c:"GuiErrMsg"
+
+$match_regex = [Regex] '^(.{4})(.{17})(.{15})(.{7})(.{11})(.{10})(.{4})'
+
+$match_evaluator = {
+    param($match)
+
+    # The first element of Groups contains the entire matched text; skip it
+    $fields = $match.Groups `
+        | Select-Object -Skip 1 `
+        | ForEach-Object -Process {
+            $field = $_.Value.Trim()
+            if ($groupsToNormalizeToZero -contains $_.Name -and $field -eq '')
+            {
+                $field = '0'
+            }
+            return $field
+        }
+    return ($fields -join $delimiter)
+}
+
+$delimiter = ','
+# Replace with a HashSet/Hashtable for better lookup performance
+$groupsToNormalizeToZero = ,'3'
+
+$outputLines = $commandOutput -split "`r`n"
+$processedOutput = foreach ($line in $outputLines) {
+    $new_line = $match_regex.Replace($line, $match_evaluator)
+
+    # The original input string is returned if there was no match
+    if (-not [Object]::ReferenceEquals($line, $new_line)) {
+        $new_line
+    }
+}
+
+$processedOutput | Set-Content -Path $logfileVSFCSV -Force
+
+##
+
+$logfileRSFCSV = "C:\Monitoring\CSV\$(Hostname)_RSF.csv"
+
+$commandOutput = C:\Monitoring\cli.exe rsf info | findstr /v /r /c:"==" /c:"GuiErrMsg"
+
+$match_regex = [Regex] '^(.{4})(.{25})(.{5})(.{11})(.{11})(.{4})'
+
+$match_evaluator = {
+    param($match)
+
+    # The first element of Groups contains the entire matched text; skip it
+    $fields = $match.Groups `
+        | Select-Object -Skip 1 `
+        | ForEach-Object -Process {
+            $field = $_.Value.Trim()
+            if ($groupsToNormalizeToZero -contains $_.Name -and $field -eq '')
+            {
+                $field = '0'
+            }
+            return $field
+        }
+    return ($fields -join $delimiter)
+}
+
+$delimiter = ','
+# Replace with a HashSet/Hashtable for better lookup performance
+$groupsToNormalizeToZero = ,'3'
+
+$outputLines = $commandOutput -split "`r`n"
+$processedOutput = foreach ($line in $outputLines) {
+    $new_line = $match_regex.Replace($line, $match_evaluator)
+
+    # The original input string is returned if there was no match
+    if (-not [Object]::ReferenceEquals($line, $new_line)) {
+        $new_line
+    }
+}
+
+$processedOutput | Set-Content -Path $logfileRSFCSV -Force
+
+## X - OS RAID Health
+$rstcliOutput = C:\Monitoring\RstCliPro.exe -I --disableVersionCheck |findstr /c:"State"
+
+# Split the rstcli output into individual lines
+$rstcliLines = $rstcliOutput -split "`n"
+
+# Initialize arrays to store data
+$states = @()
+
+# Loop through the lines and extract the state information
+foreach ($line in $rstcliLines) {
+    if ($line -match "State:\s*(.*)") {
+        $entryState = $matches[1].Trim()
+        if ($entryState) {
+            $states += $entryState
+        }
+    }
+}
+
+# Create a custom object to hold the data
+$data = @()
+$data += [PSCustomObject]@{
+    Volume = $states[0]
+    "Drive 1" = $states[1]
+    "Drive 2" = $states[2]
+}
+
+# Export the data to a CSV file
+$data | Export-Csv -Path "C:\Monitoring\CSV\$(Hostname)_RstStates.csv" -NoTypeInformation
+
+##
+
+$rstcliOutput = C:\Monitoring\RstCliPro.exe -I --disableVersionCheck |findstr /c:"Name" /c:"Model"
+
+# Split the rstcli output into individual lines
+$rstcliLines = $rstcliOutput -split "`n"
+
+# Initialize arrays to store data
+$nameModels = @()
+
+# Loop through the lines and extract the "Name" and "Model" information
+foreach ($line in $rstcliLines) {
+    if ($line -match "Name:\s*(.*)") {
+        $entryName = $matches[1].Trim()
+        $nameModels += [PSCustomObject]@{
+            "Name and Model" = $entryName
+        }
+    }
+    elseif ($line -match "Model:\s*(.*)") {
+        $entryModel = $matches[1].Trim()
+        $nameModels += [PSCustomObject]@{
+            "Name and Model" = $entryModel
+        }
+    }
+}
+
+# Export the data to a CSV file
+$nameModels | Export-Csv -Path "C:\Monitoring\CSV\$(Hostname)_Rst_Info.csv" -NoTypeInformation
+
+
+## X - Disk Space
+$hostname = $env:COMPUTERNAME
+$queryParams = @{
+    ClassName = "win32_logicaldisk"
+    Filter = "DriveType=3"
+}
+
+$disks = Get-CimInstance @queryParams | Select-Object SystemName, DeviceID, VolumeName,
+    @{Label = "Total Size (GB)"; Expression = {[math]::Round($_.Size / 1GB, 2)}},
+    @{Label = "Free Size (GB)"; Expression = {[math]::Round($_.FreeSpace / 1GB, 2)}},
+    @{Label = "Free Space (%)"; Expression = {[math]::Round(($_.FreeSpace / $_.Size) * 100, 2)}}
+
+# Rename the SystemName column to Hostname
+$disks = $disks | Select-Object @{Name = "Hostname"; Expression = {$hostname}},
+    DeviceID, VolumeName, "Total Size (GB)", "Free Size (GB)", "Free Space (%)"
+
+$disks | Export-Csv -Path "C:\Monitoring\CSV\$($hostname)_DiskSpace.csv" -NoTypeInformation
+
+
+## X - Windows Info
+$csvPath = "C:\Monitoring\CSV\$($hostname)_Windows_Info.csv"
+$osInfo = Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version, BuildNumber, ServicePackMajorVersion, OSArchitecture
+$osInfo | Export-Csv -Path $csvPath -NoTypeInformation
+
+## X - Any expiring certs
+
+# Get certificates expiring in the next 30 days
+#$certificates = Get-ChildItem -Path 'Cert:' -Recurse -ExpiringInDays 30 | Select-Object Subject, NotAfter
+
+# Export certificates to a CSV file
+#$csvFilePath = "C:\Monitoring\CSV\$(Hostname)_Certificates_ExpiringSoon.csv"
+#$certificates | Export-Csv -Path $csvFilePath -NoTypeInformation
+
+#Write-Host "Certificates expiring in the next 30 days have been exported to: $csvFilePath"
+
+## X - Windows license status
+
+# Run slmgr.vbs and capture the output
+$slmgrOutput = & cscript.exe C:\Windows\System32\slmgr.vbs /dli
+
+# Define regular expressions to extract relevant information
+$licenseStatusPattern = "License Status:\s+(.+)"
+$remainingTimePattern = "Remaining Windows rearm count:\s+\d+\s+Time remaining: (\d{1,2})"
+$namePattern = "Name:\s+(.+)"
+
+# Initialize variables to hold extracted information
+$licenseStatus = ""
+$remainingTime = ""
+$name = ""
+$description = ""
+$notificationReason = ""
+
+# Extract license status, remaining time, name, description, and notification reason
+$slmgrOutput | ForEach-Object {
+    if ($_ -match $licenseStatusPattern) {
+        $licenseStatus = $Matches[1]
+    }
+    if ($_ -match $remainingTimePattern) {
+        $remainingTime = $Matches[1]
+    }
+    if ($_ -match $namePattern) {
+        $name = $Matches[1]
+    }
+    if ($_ -match "Description:\s+(.+)") {
+        $description = $Matches[1]
+    }
+    if ($_ -match "Notification Reason:\s+(.+)") {
+        $notificationReason = $Matches[1]
+    }
+}
+
+# Create a custom object with the extracted information
+$licenseObject = [PSCustomObject]@{
+    Name = $name
+    Description = $description
+    LicenseStatus = $licenseStatus
+    RemainingTime = $remainingTime
+    NotificationReason = $notificationReason
+}
+
+# Export the custom object to a CSV file
+$licenseObject | Export-Csv -Path "C:\Monitoring\CSV\$(Hostname)_license_info.csv" -NoTypeInformation
+
+## X - Performance Counters
+
+$csvFilePath = "C:\Monitoring\CSV\$(Hostname)_performance_data.csv"
+
+# Get performance counter data
+$memoryAvailable = (Get-Counter -Counter "\Memory\Available MBytes").CounterSamples[0].CookedValue
+$diskTime = (Get-Counter -Counter "\PhysicalDisk(_Total)\% Disk Time").CounterSamples[0].CookedValue
+$bytesReceivedPerSec = (Get-Counter -Counter "\Network Interface(*)\Bytes Received/sec").CounterSamples[0].CookedValue
+$bytesSentPerSec = (Get-Counter -Counter "\Network Interface(*)\Bytes Sent/sec").CounterSamples[0].CookedValue
+$systemUpTime = (Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime
+$timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+
+# Convert system up time to a readable format
+$systemUpTimeFormatted = (Get-Date $systemUpTime).ToString("yyyy-MM-dd HH:mm:ss")
+
+# Create an object to store the data
+$dataObject = [PSCustomObject]@{
+    Timestamp = $timestamp
+    MemoryAvailableMB = $memoryAvailable
+    DiskTime = $diskTime
+    BytesReceivedPerSec = $bytesReceivedPerSec
+    BytesSentPerSec = $bytesSentPerSec
+    SystemUpTime = $systemUpTimeFormatted
+}
+
+# Export data to CSV file with comma as delimiter
+$dataObject | Export-Csv -Path $csvFilePath -Delimiter ',' -NoTypeInformation -Append
+
+Write-Host "Performance data has been logged to $csvFilePath."
+
+## X - Software Versions
+
+$software = Get-WmiObject -Class Win32_Product | Where-Object { $_.Name -like "*Microsoft SQL Server*" -or $_.Name -like "*MAXPRO*" -or $_.Name -like "*Softkey*" } | Select-Object Name, Version | Sort-Object Name
+$software | Export-Csv -Path "C:\Monitoring\CSV\$(Hostname)_SW_Versions.csv" -NoTypeInformation
+
+# Run Import script
+$scriptPath = "C:\Monitoring\SQL_CSV_Import.ps1"
+& $scriptPath
+
+# Run Export script
+$scriptPath = "C:\Monitoring\Prep_Export.ps1"
+& $scriptPath
+
+SQL_CSV_Import.ps1
+
+# SQL Server connection details
+$databaseName = "TrinityDatabase"
+$registryKeyPath = "HKLM:\SOFTWARE\WOW6432Node\Honeywell\MaxproNVR\TrinityFramework"
+$instanceName = (Get-ItemProperty -Path $registryKeyPath).INSTNAME
+$hostname = [System.Net.Dns]::GetHostName()
+$fullInstanceName = "$hostname\$instanceName"
+
+# Function to execute SQL query
+function Execute-SqlQuery($query) {
+    Invoke-Expression "sqlcmd -S $fullInstanceName -d $databaseName -E -Q `"$query`""
+}
+
+# Table names
+$tableNameDisk = "vw_RAID_Disks"
+$tableNameVSF = "vw_RAID_VSF"
+$tableNameRSF = "vw_RAID_RSF"
+
+# Drop tables if they exist
+$dropTableQueryDisk = "IF OBJECT_ID('$tableNameDisk', 'U') IS NOT NULL DROP TABLE $tableNameDisk;"
+$dropTableQueryVSF = "IF OBJECT_ID('$tableNameVSF', 'U') IS NOT NULL DROP TABLE $tableNameVSF;"
+$dropTableQueryRSF = "IF OBJECT_ID('$tableNameRSF', 'U') IS NOT NULL DROP TABLE $tableNameRSF;"
+
+Execute-SqlQuery $dropTableQueryDisk
+Execute-SqlQuery $dropTableQueryVSF
+Execute-SqlQuery $dropTableQueryRSF
+
+# Process Disk, VSF, and RSF CSVs
+$csvFilePathDisk = "C:\Monitoring\CSV\$(Hostname)_Disk.csv"
+$csvFilePathVSF = "C:\Monitoring\CSV\$(Hostname)_VSF.csv"
+$csvFilePathRSF = "C:\Monitoring\CSV\$(Hostname)_RSF.csv"
+
+if ($instanceName -ne $null) {
+    # Disk CSV
+    $createTableQueryDisk = @"
+    CREATE TABLE $tableNameDisk (
+        Hostname NVARCHAR(255),
+        [Number] INT,
+        Enc NVARCHAR(255),
+        Slot NVARCHAR(255),
+        ModelName NVARCHAR(255),
+        Capacity NVARCHAR(255),
+        Usage NVARCHAR(255)
+    );
+"@
+    Execute-SqlQuery $createTableQueryDisk
+
+    $dataDisk = Get-Content -Path $csvFilePathDisk
+    $dataDisk[0] = $dataDisk[0] -replace '^#,', 'Hostname,Number,'
+
+    for ($i = 1; $i -lt $dataDisk.Length; $i++) {
+        $dataDisk[$i] = $dataDisk[$i] -replace '(?<!"),#', 'Number'
+
+        $valuesDisk = $dataDisk[$i] -split ',', 6
+        $number = $valuesDisk[0]
+        $encNumber = $valuesDisk[1]
+        $slotNumber = $valuesDisk[2]
+        $modelName = $valuesDisk[3]
+        $capacity = $valuesDisk[4]
+        $usage = $valuesDisk[5]
+
+        $queryDisk = "INSERT INTO $tableNameDisk (Hostname, [Number], Enc, Slot, ModelName, Capacity, Usage) VALUES ('$hostname', '$number', '$encNumber', '$slotNumber', '$modelName', '$capacity', '$usage')"
+        Execute-SqlQuery $queryDisk
+    }
+
+    # VSF CSV
+    $createTableQueryVSF = @"
+    CREATE TABLE $tableNameVSF (
+        Hostname NVARCHAR(255),
+        [Number] INT,
+        [Name] NVARCHAR(255),
+        [Raid Name] NVARCHAR(255),
+        [Level] NVARCHAR(255),
+        [Capacity] NVARCHAR(255),
+        [Ch/Id/Lun] NVARCHAR(255),
+        [State] NVARCHAR(255)
+    );
+"@
+    Execute-SqlQuery $createTableQueryVSF
+
+    $dataVSF = Get-Content -Path $csvFilePathVSF
+    $dataVSF[0] = $dataVSF[0] -replace '^#,', 'Hostname,Number,'
+
+    for ($i = 1; $i -lt $dataVSF.Length; $i++) {
+        $dataVSF[$i] = $dataVSF[$i] -replace '(?<!"),#', 'Number'
+
+        $valuesVSF = $dataVSF[$i] -split ',', 8
+        $number = $valuesVSF[0]
+        $name = $valuesVSF[1]
+        $raidName = $valuesVSF[2]
+        $level = $valuesVSF[3]
+        $capacity = $valuesVSF[4]
+        $chIdLun = $valuesVSF[5]
+        $state  = $valuesVSF[6]
+
+        $queryVSF = "INSERT INTO $tableNameVSF (Hostname, [Number], [Name], [Raid Name], [Level], [Capacity], [Ch/Id/Lun], [State]) VALUES ('$hostname', '$number', '$name', '$raidName', '$level', '$capacity', '$chIdLun', '$state')"
+        Execute-SqlQuery $queryVSF
+    }
+
+    # RSF CSV
+    $createTableQueryRSF = @"
+    CREATE TABLE $tableNameRSF (
+        Hostname NVARCHAR(255),
+        [Number] INT,
+        [Name] NVARCHAR(255),
+        [Disks] INT,
+        [Total] NVARCHAR(255),
+        [Free] NVARCHAR(255),
+        [State] NVARCHAR(255)
+    );
+"@
+    Execute-SqlQuery $createTableQueryRSF
+
+    $dataRSF = Get-Content -Path $csvFilePathRSF
+    $dataRSF[0] = $dataRSF[0] -replace '^#,', 'Hostname,Number,'
+
+    for ($i = 1; $i -lt $dataRSF.Length; $i++) {
+        $dataRSF[$i] = $dataRSF[$i] -replace '(?<!"),#', 'Number'
+
+        $valuesRSF = $dataRSF[$i] -split ',', 7
+        $number = $valuesRSF[0]
+        $name = $valuesRSF[1]
+        $disks = $valuesRSF[2]
+        $total = $valuesRSF[3]
+        $free = $valuesRSF[4]
+        $state = $valuesRSF[5]
+
+        $queryRSF = "INSERT INTO $tableNameRSF (Hostname, [Number], [Name], [Disks], [Total], [Free], [State]) VALUES ('$hostname', '$number', '$name', '$disks', '$total', '$free', '$state')"
+        Execute-SqlQuery $queryRSF
+    }
+}
+
+# Process RSF States CSV
+$csvFilePathRstStates = "C:\Monitoring\CSV\$(Hostname)_RstStates.csv"
+$tableNameRstStates = "vw_OSRAID_States"
+
+if ($instanceName -ne $null) {
+    # Drop table if it exists
+    $dropTableQueryRstStates = "IF OBJECT_ID('$tableNameRstStates', 'U') IS NOT NULL DROP TABLE $tableNameRstStates;"
+    Execute-SqlQuery $dropTableQueryRstStates
+
+    $createTableQueryRstStates = @"
+    CREATE TABLE $tableNameRstStates (
+        Hostname NVARCHAR(255),
+        [Volume] NVARCHAR(255),
+        [Drive 1] NVARCHAR(255),
+        [Drive 2] NVARCHAR(255)
+    );
+"@
+    Execute-SqlQuery $createTableQueryRstStates
+
+    $dataRstStates = Get-Content -Path $csvFilePathRstStates
+    $dataRstStates[0] = $dataRstStates[0] -replace '^', 'Hostname,'
+
+    for ($i = 1; $i -lt $dataRstStates.Length; $i++) {
+        # Split line using CSV format
+        $valuesRstStates = ($dataRstStates[$i] -split '","') -replace '^"|"$'
+
+        $volume = $valuesRstStates[0]
+        $drive1 = $valuesRstStates[1]
+        $drive2 = $valuesRstStates[2]
+
+        $queryRstStates = "INSERT INTO $tableNameRstStates (Hostname, [Volume], [Drive 1], [Drive 2]) VALUES ('$hostname', '$volume', '$drive1', '$drive2')"
+        Execute-SqlQuery $queryRstStates
+    }
+}
+
+####
+
+# Process RSF Info CSV
+$csvFilePathRstInfo = "C:\Monitoring\CSV\$(Hostname)_Rst_Info.csv"
+$tableNameRstInfo = "vw_OSRAID_Info"
+
+if ($instanceName -ne $null) {
+    # Drop table if it exists
+    $dropTableQueryRstInfo = "IF OBJECT_ID('$tableNameRstInfo', 'U') IS NOT NULL DROP TABLE $tableNameRstInfo;"
+    Execute-SqlQuery $dropTableQueryRstInfo
+
+    $createTableQueryRstInfo = @"
+    CREATE TABLE $tableNameRstInfo (
+        Hostname NVARCHAR(255),
+        [Info] NVARCHAR(MAX)
+    );
+"@
+    Execute-SqlQuery $createTableQueryRstInfo
+
+    $dataRstInfo = Get-Content -Path $csvFilePathRstInfo
+
+    # Skip the header line
+    for ($i = 1; $i -lt $dataRstInfo.Length; $i++) {
+        $info = $dataRstInfo[$i]
+
+        # Sanitize the CSV data (remove unwanted characters)
+        $sanitizedInfo = $info -replace '[\\/:*?"<>|]', ''
+
+        # Skip empty or null values
+        if (![string]::IsNullOrWhiteSpace($sanitizedInfo)) {
+            $queryRstInfo = "INSERT INTO $tableNameRstInfo (Hostname, [Info]) VALUES ('$hostname', '$sanitizedInfo')"
+            Execute-SqlQuery $queryRstInfo
+        }
+    }
+}
+
+####
+
+# Process Disk Space CSV
+$csvFilePathDiskSpace = "C:\Monitoring\CSV\$(Hostname)_DiskSpace.csv"
+$tableNameDiskSpace = "vw_Win_DiskSpace"
+
+if ($instanceName -ne $null) {
+    # Drop table if it exists
+    $dropTableQueryDiskSpace = "IF OBJECT_ID('$tableNameDiskSpace', 'U') IS NOT NULL DROP TABLE $tableNameDiskSpace;"
+    Execute-SqlQuery $dropTableQueryDiskSpace
+
+    $createTableQueryDiskSpace = @"
+    CREATE TABLE $tableNameDiskSpace (
+        [Hostname] NVARCHAR(255),
+        [DeviceID] NVARCHAR(255),
+        [VolumeName] NVARCHAR(255),
+        [TotalSize_GB] FLOAT,
+        [FreeSize_GB] FLOAT,
+        [FreeSpace_Percent] FLOAT
+    );
+"@
+    Execute-SqlQuery $createTableQueryDiskSpace
+
+    $dataDiskSpace = Get-Content -Path $csvFilePathDiskSpace
+    $dataDiskSpace[0] = $dataDiskSpace[0] -replace '^', 'Hostname,'
+
+    for ($i = 1; $i -lt $dataDiskSpace.Length; $i++) {
+        # Split line using CSV format
+        $valuesDiskSpace = ($dataDiskSpace[$i] -split '","') -replace '^"|"$'
+
+        $hostname = $valuesDiskSpace[0] # Renamed variable
+        $deviceID = $valuesDiskSpace[1]
+        $volumeName = $valuesDiskSpace[2]
+        $totalSize = [float]::Parse($valuesDiskSpace[3])
+        $freeSize = [float]::Parse($valuesDiskSpace[4])
+        $freeSpacePercent = [float]::Parse($valuesDiskSpace[5])
+
+        $queryDiskSpace = "INSERT INTO $tableNameDiskSpace ([Hostname], [DeviceID], [VolumeName], [TotalSize_GB], [FreeSize_GB], [FreeSpace_Percent]) VALUES ('$hostname', '$deviceID', '$volumeName', $totalSize, $freeSize, $freeSpacePercent)"
+        Execute-SqlQuery $queryDiskSpace
+    }
+}
+
+# Process Windows Info CSV
+$csvFilePathWinInfo = "C:\Monitoring\CSV\$($hostname)_Windows_Info.csv"
+$tableNameWinInfo = "vw_Win_Info"
+
+if ($instanceName -ne $null) {
+    # Drop table if it exists
+    $dropTableQueryWinInfo = "IF OBJECT_ID('$tableNameWinInfo', 'U') IS NOT NULL DROP TABLE $tableNameWinInfo;"
+    Execute-SqlQuery $dropTableQueryWinInfo
+
+    $createTableQueryWinInfo = @"
+    CREATE TABLE $tableNameWinInfo (
+        [Hostname] NVARCHAR(255),
+        [Caption] NVARCHAR(255),
+        [Version] NVARCHAR(255),
+        [BuildNumber] NVARCHAR(255),
+        [ServicePackMajorVersion] NVARCHAR(255),
+        [OSArchitecture] NVARCHAR(255)
+    );
+"@
+    Execute-SqlQuery $createTableQueryWinInfo
+
+    $dataWinInfo = Get-Content -Path $csvFilePathWinInfo
+    $dataWinInfo[0] = $dataWinInfo[0] -replace '^', 'Hostname,'
+
+    for ($i = 1; $i -lt $dataWinInfo.Length; $i++) {
+        # Split line using CSV format
+        $valuesWinInfo = ($dataWinInfo[$i] -split '","') -replace '^"|"$'
+
+        $caption = $valuesWinInfo[0]
+        $version = $valuesWinInfo[1]
+        $buildNumber = $valuesWinInfo[2]
+        $servicePackMajorVersion = $valuesWinInfo[3]
+        $osArchitecture = $valuesWinInfo[4]
+
+        $queryWinInfo = "INSERT INTO $tableNameWinInfo ([Hostname], [Caption], [Version], [BuildNumber], [ServicePackMajorVersion], [OSArchitecture]) VALUES ('$hostname', '$caption', '$version', '$buildNumber', '$servicePackMajorVersion', '$osArchitecture')"
+        Execute-SqlQuery $queryWinInfo
+    }
+}
+
+# License Info
+
+# Process License Info CSV
+$csvFilePathLicenseInfo = "C:\Monitoring\CSV\$(Hostname)_license_info.csv"
+$tableNameLicenseInfo = "vw_Win_License"
+
+if ($instanceName -ne $null) {
+    # Drop table if it exists
+    Execute-SqlQuery "IF OBJECT_ID('$tableNameLicenseInfo', 'U') IS NOT NULL DROP TABLE $tableNameLicenseInfo;"
+
+    # Construct the CREATE TABLE query
+    $createTableQueryLicenseInfo = @"
+    CREATE TABLE $tableNameLicenseInfo (
+        [Hostname] NVARCHAR(255),
+        [Name] NVARCHAR(255),
+        [Description] NVARCHAR(255),
+        [LicenseStatus] NVARCHAR(255),
+        [RemainingTime] NVARCHAR(255),
+        [NotificationReason] NVARCHAR(255)
+    );
+"@
+    Execute-SqlQuery $createTableQueryLicenseInfo
+
+    # Read the CSV data and insert into the table
+    $csvData = Get-Content -Path $csvFilePathLicenseInfo | Select-Object -Skip 1
+
+    foreach ($line in $csvData) {
+        # Remove quotes around the line and split by ","
+        $values = ($line -replace '^"|"$' -split '","') | ForEach-Object {
+            $_ -replace '""', '"'  # Handle escaped quotes
+        }
+
+        $insertValues = "'$hostname', '$($values -join "', '")'"
+
+        $queryLicenseInfo = "INSERT INTO $tableNameLicenseInfo ([Hostname], [Name], [Description], [LicenseStatus], [RemainingTime], [NotificationReason]) VALUES ($insertValues)"
+        Execute-SqlQuery $queryLicenseInfo
+    }
+}
+
+# Perf Counters
+
+# Process Performance Data CSV
+$csvFilePathPerfData = "C:\Monitoring\CSV\$(Hostname)_performance_data.csv"
+$tableNamePerfData = "vw_Perf_Data"
+
+if ($instanceName -ne $null) {
+    # Drop table if it exists
+    Execute-SqlQuery "IF OBJECT_ID('$tableNamePerfData', 'U') IS NOT NULL DROP TABLE $tableNamePerfData;"
+
+    # Construct the CREATE TABLE query
+    $createTableQueryPerfData = @"
+    CREATE TABLE $tableNamePerfData (
+        [Hostname] NVARCHAR(255),
+        [Timestamp] DATETIME,
+        [MemoryAvailableMB] INT,
+        [DiskTime] INT,
+        [BytesReceivedPerSec] INT,
+        [BytesSentPerSec] INT,
+        [SystemUpTime] DATETIME
+    );
+"@
+    Execute-SqlQuery $createTableQueryPerfData
+
+    # Read the CSV data and insert into the table
+    $csvDataPerfData = Get-Content -Path $csvFilePathPerfData | Select-Object -Skip 1
+
+    foreach ($line in $csvDataPerfData) {
+        # Remove quotes around the line and split by ","
+        $valuesPerfData = ($line -replace '^"|"$' -split '","') | ForEach-Object {
+            $_ -replace '""', '"'  # Handle escaped quotes
+        }
+
+        # Convert Timestamp and SystemUpTime to valid DATETIME format
+        $timestamp = [datetime]::Parse($valuesPerfData[0])
+        $systemUpTime = [datetime]::Parse($valuesPerfData[5])
+
+        $insertValuesPerfData = "'$hostname', '$timestamp', $($valuesPerfData[1..4] -join ", "), '$systemUpTime'"
+
+        $queryPerfData = "INSERT INTO $tableNamePerfData ([Hostname], [Timestamp], [MemoryAvailableMB], [DiskTime], [BytesReceivedPerSec], [BytesSentPerSec], [SystemUpTime]) VALUES ($insertValuesPerfData)"
+        Execute-SqlQuery $queryPerfData
+    }
+}
+
+# Software Versions
+
+# Process Software Versions CSV
+$csvFilePathSWVersions = "C:\Monitoring\CSV\$(Hostname)_SW_Versions.csv"
+$tableNameSWVersions = "vw_Software_Versions"
+
+if ($instanceName -ne $null) {
+    # Drop table if it exists
+    Execute-SqlQuery "IF OBJECT_ID('$tableNameSWVersions', 'U') IS NOT NULL DROP TABLE $tableNameSWVersions;"
+
+    # Construct the CREATE TABLE query
+    $createTableQuerySWVersions = @"
+    CREATE TABLE $tableNameSWVersions (
+        [Hostname] NVARCHAR(255),
+        [Name] NVARCHAR(255),
+        [Version] NVARCHAR(255)
+    );
+"@
+    Execute-SqlQuery $createTableQuerySWVersions
+
+    # Read the CSV data and insert into the table
+    $csvDataSWVersions = Get-Content -Path $csvFilePathSWVersions | Select-Object -Skip 1
+
+    foreach ($line in $csvDataSWVersions) {
+        # Remove quotes around the line and split by ","
+        $valuesSWVersions = ($line -replace '^"|"$' -split '","') | ForEach-Object {
+            $_ -replace '""', '"'  # Handle escaped quotes
+        }
+
+        $insertValuesSWVersions = "'$hostname', '$($valuesSWVersions -join "', '")'"
+
+        $querySWVersions = "INSERT INTO $tableNameSWVersions ([Hostname], [Name], [Version]) VALUES ($insertValuesSWVersions)"
+        Execute-SqlQuery $querySWVersions
+    }
+}
+
+# Path to the SQL script
+$sqlScriptPath = "C:\Monitoring\SQL\CLEAN_REGEX_TABLES.sql"
+
+# Read the content of the SQL script
+$sqlScriptContent = Get-Content -Path $sqlScriptPath -Raw
+
+# Execute the SQL script
+Execute-SqlQuery $sqlScriptContent
+
+CLEAN_REGEX_TABLES.sql
+
+USE TrinityDatabase
+
+
+-- Remove trailing spaces from columns in vw_RAID_Disks
+UPDATE vw_RAID_Disks
+SET [Usage] = RTRIM([Usage]);
+
+-- Remove trailing spaces from columns in vw_RAID_RSF
+UPDATE vw_RAID_RSF
+SET [State] = RTRIM([State]);
+
+-- Remove trailing spaces from columns in vw_RAID_VSF
+UPDATE vw_RAID_VSF
+SET [State] = RTRIM([State]);
+
+Prep_Export.ps1
+
+# Configuration
+$databaseName = "TrinityDatabase"
+$registryKeyPath = "HKLM:\SOFTWARE\WOW6432Node\Honeywell\MaxproNVR\TrinityFramework"
+$instanceName = (Get-ItemProperty -Path $registryKeyPath).INSTNAME
+$hostname = [System.Net.Dns]::GetHostName()
+$fullInstanceName = "$hostname\$instanceName"
+
+$ipAddress = $env:HostIP = (
+    Get-NetIPConfiguration |
+    Where-Object {
+        $_.IPv4DefaultGateway -ne $null -and
+        $_.NetAdapter.Status -ne "Disconnected"
+    }
+).IPv4Address.IPAddress
+
+# If using a named instance, modify the server name
+$serverName = "$hostname\$instanceName"
+$connectionString = "Server=$serverName;Database=$databaseName;Integrated Security=True"
+
+# Tables to export
+$tables = @(
+    "vw_OSRAID_Info",
+    "vw_OSRAID_States",
+    "vw_Perf_Data",
+    "vw_RAID_Disks",
+    "vw_RAID_RSF",
+    "vw_RAID_VSF",
+    "vw_Software_Versions",
+    "vw_Win_DiskSpace",
+    "vw_Win_Info",
+    "vw_Win_License"
+)
+
+# Output folder for CSV files
+$outputFolder = "C:\Monitoring\Export"
+
+# Create output folder if it doesn't exist
+if (-not (Test-Path -Path $outputFolder -PathType Container)) {
+    New-Item -Path $outputFolder -ItemType Directory
+}
+
+# Loop through tables and export data to CSV files
+foreach ($table in $tables) {
+    $query = @"
+        SELECT '$ipAddress' AS IPAddress, *
+        FROM $table
+"@
+    $csvPath = Join-Path -Path $outputFolder -ChildPath "$(Hostname)_$table.csv"
+
+    # Extract data from the specified table and export to CSV
+    Invoke-Sqlcmd -ServerInstance $serverName -Database $databaseName -Query $query -OutputSqlErrors $true | Export-Csv -Path $csvPath -NoTypeInformation
+
+    Write-Host "Data extraction and export completed for $table."
+}
+
+Write-Host "Data extraction and export completed for all tables."
